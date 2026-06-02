@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CBT Ulangan Online - SMAN 1 Puding Besar</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans min-h-screen">
+
+  <header class="bg-blue-700 text-white p-4 shadow-md flex justify-between items-center font-bold">
+    <span>💻 CBT ULANGAN ONLINE</span>
+    <span id="timer-display" class="hidden bg-red-600 px-3 py-1 rounded text-sm animate-pulse">Sisa Waktu: --:--</span>
+  </header>
+
+  <main class="container mx-auto p-4 max-w-2xl mt-6">
+    
+    <div id="login-box" class="bg-white p-6 rounded-xl shadow-lg border">
+      <h2 class="text-xl font-bold text-gray-800 text-center mb-4">Biodata Peserta Ujian</h2>
+      <div class="space-y-3">
+        <div>
+          <label class="text-sm font-semibold text-gray-600 block mb-1">Nomor Induk / ID Siswa</label>
+          <input type="text" id="siswa-id" placeholder="Contoh: SIS_001" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono uppercase">
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-gray-600 block mb-1">Nama Lengkap Siswa</label>
+          <input type="text" id="siswa-nama" placeholder="Masukkan nama lengkap" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500">
+        </div>
+        <button onclick="mulaiUjian()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg shadow transition">
+          Mulai Masuk & Kerjakan Soal
+        </button>
+      </div>
+    </div>
+
+    <div id="exam-box" class="hidden bg-white p-6 rounded-xl shadow-lg border select-none" oncontextmenu="return false;">
+      <div class="flex justify-between items-center border-b pb-2 mb-4 text-xs font-bold text-gray-400 uppercase">
+        <span id="info-nama-peserta">Peserta: --</span>
+        <span id="progress-soal">Soal: --/--</span>
+      </div>
+
+      <div class="mb-6">
+        <p id="teks-pertanyaan" class="text-gray-800 font-semibold text-lg leading-relaxed mb-4"></p>
+        
+        <div class="space-y-2.5" id="opsi-jawaban">
+          </div>
+      </div>
+
+      <div class="flex justify-between items-center border-t pt-4">
+        <button onclick="soalSebelumnya()" id="btn-prev" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg text-sm transition">
+          ⬅️ Sebelumnya
+        </button>
+        <button onclick="soalSelanjutnya()" id="btn-next" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition">
+          Selanjutnya ➡️
+        </button>
+        <button onclick="konfirmasiSelesai()" id="btn-submit" class="hidden bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg text-sm transition shadow-md">
+          🏁 Selesai Ujian
+        </button>
+      </div>
+    </div>
+
+    <div id="result-box" class="hidden bg-white p-8 rounded-xl shadow-lg border text-center">
+      <div class="text-5xl mb-3">🎉</div>
+      <h2 class="text-2xl font-bold text-gray-800 mb-1">Ujian Selesai!</h2>
+      <p class="text-sm text-gray-500 mb-6">Jawaban Anda berhasil dikirim langsung ke database nilai guru.</p>
+      <div class="bg-blue-50 p-4 rounded-lg inline-block border border-blue-100">
+        <span class="text-xs font-bold text-gray-500 uppercase tracking-wider block">Nilai Anda</span>
+        <span id="skor-akhir" class="text-4xl font-extrabold text-blue-700">0</span>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    // MASUKKAN URL GOOGLE APP SCRIPT CBT ANDA DISINI
+    const GAS_CBT_URL = "https://script.google.com/macros/s/AKfycbxQWMZ3KmCXBZ-85xEERrih2KSw0cpbR1sbyjV_UWvreMSNIAbhn2lCVIMz8WaKQCV7FQ/exec"; 
+
+    let bankSoal = [];
+    let jawabanSiswa = {};
+    let indeksSekarang = 0;
+    let sisaWaktu = 15 * 60; // Waktu ujian default: 15 Menit (bisa diganti sesuai kebutuhan)
+    let hitungMundur;
+
+    function mulaiUjian() {
+      const idSiswa = document.getElementById('siswa-id').value.trim();
+      const namaSiswa = document.getElementById('siswa-nama').value.trim();
+
+      if(!idSiswa || !namaSiswa) return alert("Silakan lengkapi ID dan Nama terlebih dahulu!");
+
+      document.getElementById('login-box').innerHTML = "<p class='text-center text-gray-500 p-4 font-semibold animate-pulse'>Mengunduh paket soal & mengamankan lembar ujian...</p>";
+
+      fetch(GAS_CBT_URL + "?action=getSoal", { method: "POST", body: JSON.stringify({}) })
+      .then(res => res.json())
+      .then(response => {
+        if(response.success) {
+          bankSoal = response.data;
+          document.getElementById('login-box').classList.add('hidden');
+          document.getElementById('exam-box').classList.remove('hidden');
+          document.getElementById('timer-display').classList.remove('hidden');
+          document.getElementById('info-nama-peserta').innerText = `Siswa: ${namaSiswa}`;
+          
+          tampilkanSoal();
+          mulaiTimer();
+        } else {
+          alert("Gagal mengambil bank soal. Hubungi guru pengawas.");
+        }
+      });
+    }
+
+    function tampilkanSoal() {
+      const soal = bankSoal[indeksSekarang];
+      document.getElementById('progress-soal').innerText = `Soal: ${indeksSekarang + 1}/${bankSoal.length}`;
+      document.getElementById('teks-pertanyaan').innerText = `${indeksSekarang + 1}. ${soal.pertanyaan}`;
+
+      const kontainerOpsi = document.getElementById('opsi-jawaban');
+      kontainerOpsi.innerHTML = "";
+
+      const pilihan = ['a', 'b', 'c', 'd'];
+      pilihan.forEach(abjad => {
+        let opsiTeks = soal[abjad];
+        let terpilih = jawabanSiswa[soal.no] === abjad ? 'border-blue-600 bg-blue-50 text-blue-800' : 'border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700';
+
+        let itemHtml = `
+          <button onclick="pilihJawaban('${soal.no}', '${abjad}')" class="w-full text-left p-3 border-2 rounded-xl text-sm font-semibold transition flex items-center gap-3 ${terpilih}">
+            <span class="w-6 h-6 bg-white border border-gray-300 rounded-full flex items-center justify-center font-bold uppercase shadow-sm">${abjad}</span>
+            <span>${opsiTeks}</span>
+          </button>
+        `;
+        kontainerOpsi.insertAdjacentHTML('beforeend', itemHtml);
+      });
+
+      // Kontrol navigasi tombol bawah
+      document.getElementById('btn-prev').style.visibility = indeksSekarang === 0 ? 'hidden' : 'visible';
+      if (indeksSekarang === bankSoal.length - 1) {
+        document.getElementById('btn-next').classList.add('hidden');
+        document.getElementById('btn-submit').classList.remove('hidden');
+      } else {
+        document.getElementById('btn-next').classList.remove('hidden');
+        document.getElementById('btn-submit').classList.add('hidden');
+      }
+    }
+
+    function pilihJawaban(noSoal, abjadTerpilih) {
+      jawabanSiswa[noSoal] = abjadTerpilih;
+      tampilkanSoal(); // Segarkan tampilan agar tombol berubah warna biru
+    }
+
+    function soalSebelumnya() {
+      if(indeksSekarang > 0) { indeksSekarang--; tampilkanSoal(); }
+    }
+
+    function soalSelanjutnya() {
+      if(indeksSekarang < bankSoal.length - 1) { indeksSekarang++; tampilkanSoal(); }
+    }
+
+    function mulaiTimer() {
+      hitungMundur = setInterval(() => {
+        let menit = Math.floor(sisaWaktu / 60);
+        let detik = sisaWaktu % 60;
+        document.getElementById('timer-display').innerText = `Sisa Waktu: ${menit}:${detik < 10 ? '0' : ''}${detik}`;
+        
+        if (sisaWaktu <= 0) {
+          clearInterval(hitungMundur);
+          alert("Waktu habis! Jawaban Anda akan otomatis dikirim.");
+          kirimKunciKeServer();
+        }
+        sisaWaktu--;
+      }, 1000);
+    }
+
+    function konfirmasiSelesai() {
+      if(confirm("Apakah Anda yakin sudah meneliti semua nomor dan ingin mengakhiri ujian?")) {
+        kirimKunciKeServer();
+      }
+    }
+
+    function kirimKunciKeServer() {
+      clearInterval(hitungMundur);
+      document.getElementById('exam-box').innerHTML = "<p class='text-center text-gray-500 p-6 font-semibold animate-pulse'>Sedang mengkalkulasi skor & mengunci database nilai...</p>";
+      
+      const idSiswa = document.getElementById('siswa-id').value.trim();
+      const namaSiswa = document.getElementById('siswa-nama').value.trim();
+
+      fetch(GAS_CBT_URL + "?action=submitUjian", {
+        method: "POST",
+        body: JSON.stringify({
+          idSiswa: idSiswa,
+          namaSiswa: namaSiswa,
+          jawaban: jawabanSiswa
+        })
+      })
+      .then(res => res.json())
+      .then(response => {
+        if(response.success) {
+          document.getElementById('exam-box').classList.add('hidden');
+          document.getElementById('timer-display').classList.add('hidden');
+          document.getElementById('result-box').classList.remove('hidden');
+          document.getElementById('skor-akhir').innerText = response.nilai;
+        }
+      });
+    }
+  </script>
+</body>
+</html>
