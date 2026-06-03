@@ -241,40 +241,41 @@
     }
 
     // INTEGRASI GENERATOR AI GEMINI VIA GOOGLE APPS SCRIPT
-    function buatSoalPakeAI() {
-      let topik = document.getElementById('ai-topik').value.trim();
-      if(!topik) return alert("Ketik topik materi ulangan terlebih dahulu!");
+function generateSoalAI() {
+    const materi = document.getElementById('materiAI').value;
+    if(!materi) return alert('Ketik materi terlebih dahulu');
+    
+    // Mengubah text tombol menjadi sedang berpikir
+    const btn = document.getElementById('btnGenerate');
+    btn.innerText = "Berpikir...";
+    btn.disabled = true;
 
-      let btn = document.getElementById('btn-generate-ai');
-      btn.innerText = "Berpikir...";
-      btn.disabled = true;
-
-      fetch(GAS_CBT_URL + "?action=generateSoalAI", {
-        method: "POST",
-        body: JSON.stringify({ materi: topik })
-      })
-      .then(res => res.json())
-      .then(response => {
-        if(response.success) {
-          document.getElementById('form-pertanyaan').value = response.data.pertanyaan;
-          document.getElementById('form-a').value = response.data.a;
-          document.getElementById('form-b').value = response.data.b;
-          document.getElementById('form-c').value = response.data.c;
-          document.getElementById('form-d').value = response.data.d;
-          document.getElementById('form-kunci').value = response.data.kunci.toUpperCase();
-          alert("✨ AI sukses memformulasikan soal! Silakan tinjau sebelum disimpan.");
+    fetch(`${GAS_CBT_URL}?action=generateSoalAI`, {
+        method: 'POST',
+        body: JSON.stringify({ materi: materi })
+    })
+    .then(res => res.json())
+    .then(res => {
+        if(res.success) {
+            document.getElementById('pertanyaan').value = res.data.pertanyaan;
+            document.getElementById('opsiA').value = res.data.a;
+            document.getElementById('opsiB').value = res.data.b;
+            document.getElementById('opsiC').value = res.data.c;
+            document.getElementById('opsiD').value = res.data.d;
+            document.getElementById('kunci').value = res.data.kunci.toUpperCase();
         } else {
-          alert("Gagal merumuskan soal otomatis. Silakan coba sesaat lagi.");
+            // Memunculkan pesan detail masalah aslinya secara transparan
+            alert('Gagal Merumuskan: ' + (res.error || 'Terjadi kesalahan sistem backend.'));
         }
+    })
+    .catch(err => {
+        alert('Koneksi internet terputus atau URL Apps Script salah.');
+    })
+    .finally(() => {
         btn.innerText = "Generate";
         btn.disabled = false;
-      }).catch(() => {
-        alert("Koneksi gagal.");
-        btn.innerText = "Generate";
-        btn.disabled = false;
-      });
-    }
-
+    });
+}
     // SIMPAN SOAL MANUAL / HASIL AI KE DB GOOGLE SHEETS
     function simpanSoalKeSheets() {
       let tanya = document.getElementById('form-pertanyaan').value.trim();
