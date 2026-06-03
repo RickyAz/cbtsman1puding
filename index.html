@@ -242,37 +242,48 @@
 
     // INTEGRASI GENERATOR AI GEMINI VIA GOOGLE APPS SCRIPT
 function generateSoalAI() {
-    const materi = document.getElementById('materiAI').value;
-    if(!materi) return alert('Ketik materi terlebih dahulu');
+    const materiInput = document.getElementById('materiAI') || document.querySelector('input[placeholder*="Ketik materi"]');
+    const materi = materiInput ? materiInput.value.trim() : "";
     
-    // Mengubah text tombol menjadi sedang berpikir
-    const btn = document.getElementById('btnGenerate');
+    if(!materi) return alert('Silakan ketik materi pelajaran terlebih dahulu.');
+    
+    // Cari tombol generate secara dinamis berdasarkan teks atau ID
+    const btn = document.getElementById('btnGenerate') || document.querySelector('button[onclick*="generateSoalAI"]') || document.querySelector('button');
+    const txtAsli = btn.innerText;
     btn.innerText = "Berpikir...";
     btn.disabled = true;
 
     fetch(`${GAS_CBT_URL}?action=generateSoalAI`, {
         method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ materi: materi })
     })
-    .then(res => res.json())
     .then(res => {
-        if(res.success) {
-            document.getElementById('pertanyaan').value = res.data.pertanyaan;
-            document.getElementById('opsiA').value = res.data.a;
-            document.getElementById('opsiB').value = res.data.b;
-            document.getElementById('opsiC').value = res.data.c;
-            document.getElementById('opsiD').value = res.data.d;
-            document.getElementById('kunci').value = res.data.kunci.toUpperCase();
+        if (!res.ok) throw new Error('Respons server bermasalah (Status: ' + res.status + ')');
+        return res.json();
+    })
+    .then(res => {
+        if(res.success && res.data) {
+            // Mengisi form input secara otomatis dengan toleransi variasi ID elemen
+            if(document.getElementById('pertanyaan')) document.getElementById('pertanyaan').value = res.data.pertanyaan || "";
+            if(document.getElementById('opsiA')) document.getElementById('opsiA').value = res.data.a || "";
+            if(document.getElementById('opsiB')) document.getElementById('opsiB').value = res.data.b || "";
+            if(document.getElementById('opsiC')) document.getElementById('opsiC').value = res.data.c || "";
+            if(document.getElementById('opsiD')) document.getElementById('opsiD').value = res.data.d || "";
+            
+            let kunciField = document.getElementById('kunci');
+            if(kunciField && res.data.kunci) {
+                kunciField.value = res.data.kunci.toUpperCase().trim();
+            }
         } else {
-            // Memunculkan pesan detail masalah aslinya secara transparan
-            alert('Gagal Merumuskan: ' + (res.error || 'Terjadi kesalahan sistem backend.'));
+            alert('Gagal memproses soal: ' + (res.error || 'Struktur data tidak lengkap.'));
         }
     })
     .catch(err => {
-        alert('Koneksi internet terputus atau URL Apps Script salah.');
+        alert('Terjadi kesalahan koneksi: ' + err.message);
     })
     .finally(() => {
-        btn.innerText = "Generate";
+        btn.innerText = txtAsli;
         btn.disabled = false;
     });
 }
