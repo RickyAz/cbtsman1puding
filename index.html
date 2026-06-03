@@ -242,29 +242,46 @@
 
     // INTEGRASI GENERATOR AI GEMINI VIA GOOGLE APPS SCRIPT
 function generateSoalAI() {
+    // 1. Deteksi elemen input materi (mengakomodasi variasi ID elemen)
     const materiInput = document.getElementById('materiAI') || document.querySelector('input[placeholder*="Ketik materi"]');
     const materi = materiInput ? materiInput.value.trim() : "";
     
     if(!materi) return alert('Silakan ketik materi pelajaran terlebih dahulu.');
     
-    // Cari tombol generate secara dinamis berdasarkan teks atau ID
+    // 2. Deteksi tombol generate secara dinamis
     const btn = document.getElementById('btnGenerate') || document.querySelector('button[onclick*="generateSoalAI"]') || document.querySelector('button');
     const txtAsli = btn.innerText;
     btn.innerText = "Berpikir...";
     btn.disabled = true;
 
+    // 3. Eksekusi Fetch dengan instruksi mengikuti pengalihan server Google (Redirect Follow)
     fetch(`${GAS_CBT_URL}?action=generateSoalAI`, {
         method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
+        mode: 'cors',
+        redirect: 'follow', // KRITIS: Memaksa browser mengikuti URL redirect Google Apps Script
+        headers: {
+            'Content-Type': 'text/plain;charset=utf-8'
+        },
         body: JSON.stringify({ materi: materi })
     })
     .then(res => {
-        if (!res.ok) throw new Error('Respons server bermasalah (Status: ' + res.status + ')');
-        return res.json();
+        if (!res.ok) throw new Error('Koneksi ke Web App Google ditolak (Status: ' + res.status + ')');
+        return res.text(); // Ambil dalam bentuk teks mentah terlebih dahulu untuk menghindari crash parsing
     })
-    .then(res => {
+    .then(textData => {
+        if (!textData) {
+            throw new Error('Server Apps Script mengembalikan data kosong.');
+        }
+
+        let res;
+        try {
+            res = JSON.parse(textData);
+        } catch (e) {
+            throw new Error('Gagal membaca format JSON. Respons server: ' + textData);
+        }
+        
         if(res.success && res.data) {
-            // Mengisi form input secara otomatis dengan toleransi variasi ID elemen
+            // 4. Pengisian otomatis ke elemen form di browser Anda
             if(document.getElementById('pertanyaan')) document.getElementById('pertanyaan').value = res.data.pertanyaan || "";
             if(document.getElementById('opsiA')) document.getElementById('opsiA').value = res.data.a || "";
             if(document.getElementById('opsiB')) document.getElementById('opsiB').value = res.data.b || "";
@@ -276,11 +293,12 @@ function generateSoalAI() {
                 kunciField.value = res.data.kunci.toUpperCase().trim();
             }
         } else {
-            alert('Gagal memproses soal: ' + (res.error || 'Struktur data tidak lengkap.'));
+            alert('Gagal memproses soal: ' + (res.error || 'Struktur data dari AI tidak lengkap.'));
         }
     })
     .catch(err => {
-        alert('Terjadi kesalahan koneksi: ' + err.message);
+        // Menampilkan kotak dialog alert jika terjadi kegagalan sistem backend
+        alert('Sistem mendeteksi masalah: ' + err.message);
     })
     .finally(() => {
         btn.innerText = txtAsli;
